@@ -52,10 +52,11 @@ static uint32_t ctor_state(const RtLoaded *m) { return LD32(m->ctor_flag); }
 static const char *caller(const Cpu *c, char *buf, int n) { return ldr_describe(c->x[30] - 4, buf, n); }
 
 // main.npdm META: the main thread's priority (+0xE), core (+0xF) and stack size (+0x1C). kernel.c builds the main
-// thread with the 1.2.1 values; a different npdm means a different game build.
+// thread with the 1.2.1 values, so those three fields are checked. The file's hash is not: dumps that a repacking tool
+// re-signed carry a different main.npdm with the same code modules (tools/extract.py report_npdm accepts them too).
 static void check_npdm(void) {
     size_t n;
-    uint8_t *npdm = ldr_read_verified(rt_config()->exefs, "main.npdm", &n);
+    uint8_t *npdm = ldr_read(rt_config()->exefs, "main.npdm", &n);
     if (n < 0x80 || memcmp(npdm, "META", 4)) rt_fatal("boot: main.npdm has no META header");
     uint32_t stack;
     memcpy(&stack, npdm + 0x1C, 4);

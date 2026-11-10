@@ -74,6 +74,14 @@ static void hex32(const uint8_t d[32], char out[65]) {
     for (int i = 0; i < 32; i++) snprintf(out + 2 * i, 3, "%02x", d[i]);
 }
 
+uint8_t *ldr_read(const char *dir, const char *file, size_t *len) {
+    char path[1024];
+    snprintf(path, sizeof path, "%s/%s", dir, file);
+    uint8_t *p = read_file(path, len);
+    if (!p) rt_fatal("loader: cannot read %s (extract the game first: tools/extract.py)", path);
+    return p;
+}
+
 uint8_t *ldr_read_verified(const char *dir, const char *file, size_t *len) {
     const char *want = NULL;
     for (int i = 0; i < rt_exefs_sha256_count; i++)
