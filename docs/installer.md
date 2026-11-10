@@ -37,7 +37,9 @@ them.
 
 The player runs a newer installer on the same folder. It reads `xc3-install.json`, keeps `romfs/`, `exefs/`,
 `profile/` and `xc3.ini` after checking their hashes, rebuilds `xc3.exe` and re-prepares the shaders. A newer
-release that changes nothing game-derived skips the rebuild.
+release that changes nothing game-derived skips the rebuild. Re-preparing keeps `shader-cache/` while the translator identity
+(`xc3_xlate.id`, a hash of its sources) is unchanged and translates only the shaders missing from it; each release
+builds the translator again with other bytes, so the bytes do not decide (`steps.xlate_identity`).
 
 ## Setup steps
 
