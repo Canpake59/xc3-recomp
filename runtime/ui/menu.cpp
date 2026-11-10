@@ -37,6 +37,8 @@ void rt_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void vk_queue_lock(void);
 void vk_queue_unlock(void);
 void res_sizes(unsigned out[2], unsigned scene[2]);
+int res_scene_whole(void);
+int vk_sl_ready(void);
 double frame_step_limit_hz(void);
 extern const int rt_game_version;
 extern const char rt_game_name[];   // the game version shown, "2.0.0" (tools/build_game.py)
@@ -558,6 +560,16 @@ static const char *present_note(void) {
     return note;
 }
 
+// "after restart" under the Upscaler value while the choice cannot run as chosen until the game starts again: DLSS and
+// DLAA need Streamline, which starts with the game (vk_device.c), and DLAA's whole-size scene is set at start
+// (resolution.c res_scene_whole); switched to while the game runs, DLAA would smooth the game's half-size scene.
+static const char *upscaler_note(void) {
+    const char *u = cfg_value("XC3_UPSCALER");
+    int dlaa = !strcmp(u, "dlaa"), sl = dlaa || !strcmp(u, "dlss");
+    if ((sl && !vk_sl_ready()) || dlaa != res_scene_whole()) return menu_text(UI_MENU_AFTER_RESTART);
+    return nullptr;
+}
+
 // ---- the tabs
 static void tab_screen(float scale) {
     opt_begin("##screen", scale);
@@ -576,7 +588,7 @@ static void tab_screen(float scale) {
     opt_choice("XC3_DYNAMIC_RES", UI_MENU_DYNAMIC_RES, dyn, 2, UI_MENU_DYNAMIC_RES_DESC);
     static const UiTextId up[] = {UI_MENU_UPSCALER_FSR, UI_MENU_UPSCALER_BILINEAR, UI_MENU_UPSCALER_FSR3,
                                   UI_MENU_UPSCALER_DLSS, UI_MENU_UPSCALER_DLAA};
-    opt_choice("XC3_UPSCALER", UI_MENU_UPSCALER, up, 5, UI_MENU_UPSCALER_DESC);
+    opt_choice("XC3_UPSCALER", UI_MENU_UPSCALER, up, 5, UI_MENU_UPSCALER_DESC, upscaler_note());
     static const UiTextId fg[] = {UI_MENU_FRAME_GEN_OFF, UI_MENU_FRAME_GEN_DLSS, UI_MENU_FRAME_GEN_FSR};
     opt_choice("XC3_FRAME_GEN", UI_MENU_FRAME_GEN, fg, 3, UI_MENU_FRAME_GEN_DESC);
     if (!strcmp(cfg_value("XC3_FRAME_GEN"), "dlss")) {   // vk_sl.cpp vk_sl_fg_present

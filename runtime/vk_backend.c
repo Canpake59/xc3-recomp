@@ -11,7 +11,7 @@
 // the frame's display time from the pacer (nvn_api_obj.c), so present-to-present intervals stay even whatever the
 // replay took. The blit is already on the queue, so the wait blocks no submission.
 //
-// Asynchronous replay (XC3_REPLAY_ASYNC=1; default 0, which replays on the submitting thread): nvnQueueSubmitCommands
+// Asynchronous replay (XC3_REPLAY_ASYNC=1, the default; 0 replays on the submitting thread): nvnQueueSubmitCommands
 // and nvnQueuePresentTexture only queue. Each item gets its timeline value at enqueue (vk_sync_reserve), in queue
 // order; the replay thread runs the synchronous submit and present bodies in that order, so every value is signalled
 // by the submission it was handed out for. The game runs at most one frame ahead: queueing present N waits until the
@@ -143,13 +143,19 @@ static void present_image(const tex_t *t, const int crop[4], uint64_t at_ns, uin
 }
 
 // ---- Asynchronous replay
-enum { RI_SUBMIT, RI_PRESENT, RI_RELEASE };
+enum { RI_SUBMIT, RI_PRESENT, RI_RELEASE, RI_TEX_REG, RI_SAMP_REG };
+// A texture or sampler slot registration (RI_TEX_REG, RI_SAMP_REG): the replay reads the slots while it records, so a
+// registration takes effect in queue order. Applied at once, the game's re-registration of a slot for its next frame
+// reached the replay of the frame before: flat-colour scenes, wrong textures and stretched geometry while the camera
+// turned (XC3_REPLAY_ASYNC=1 in v0.1.7 to 0.2.7).
+typedef struct { tex_t t; view_t v; int has_v; samp_par s; } SlotReg;
 typedef struct {
-    int kind, n, has_crop, crop[4];
+    int kind, n, has_crop, crop[4], id;
     uint64_t value, submit_no, at, queued;
     uint64_t *h;
     void *snap;         // RI_SUBMIT: its uniform blocks as of the submit call (vk_usnap_take)
     const tex_t *tex;   // RI_RELEASE: a copy the item owns (the game may reuse the object's memory)
+    SlotReg *reg;       // RI_TEX_REG, RI_SAMP_REG: a copy the item owns
 } ReplayItem;
 #define RQ_CAP 1024   // a frame queues 1 submit and 1 present, and up to a few hundred releases
 enum { DR_POOL_FINI, DR_MAP_VIRTUAL, DR_TEX_RELEASE, DR_PROG_RELEASE, DR_FINISH, DR_READ_TEXELS, DR_WRITE_TEXELS,
@@ -172,10 +178,12 @@ static uint64_t ck_reads, ck_diff, ck_diff_unexplained, ck_diff_idle;
 int vk_replay_async(void) {
     static int on = -1;
     if (on < 0) {
-        // Off by default. On, it cut the frames over 25 ms at 4K/120 on a 9800X3D (about 78 to 58 a minute), but in
-        // play on an RTX 5090 it corrupts the 3D scene while the camera turns: flat blue, yellow or green scenes and
-        // stretched geometry for many frames, the interface intact (v0.1.7). Scripted runs with in-game captures did
-        // not show it. Off, the same play is clean.
+        // On by default. The render thread spends about 46 % of a frame replaying; here that runs beside the game's
+        // next frame. Walking in a busy field at 4K on a 9800X3D and RTX 5090 (frame generation off), frames took 10.5
+        // to 12 ms on the submitting thread and held the 120 Hz VRR cap (8.6 ms) here; without a cap, 7.5 to 8.1 ms.
+        // Releases up to 0.2.7 corrupted the scene while the camera turned: slot registrations took effect before the
+        // queued frames (RI_TEX_REG above) and the window acquire let the game reuse buffers the GPU still read
+        // (nvn_api_obj.c nvnWindowAcquireTexture). Play since those fixes is clean.
         on = cfg_bool("XC3_REPLAY_ASYNC");
         rt_log("vk: replay %s (XC3_REPLAY_ASYNC=%d)",
                on ? "on its own thread, at most one frame behind the game" : "on the submitting thread", on);
@@ -226,13 +234,21 @@ static void replay_main(void *arg) {
             vk_present_drain();
             vk_texture_release(it.tex);
             free((void *)it.tex);
+        } else if (it.kind == RI_TEX_REG) {
+            vk_texture_register(it.id, &it.reg->t, it.reg->has_v ? &it.reg->v : NULL);
+            free(it.reg);
+        } else if (it.kind == RI_SAMP_REG) {
+            vk_sampler_register(it.id, &it.reg->s);
+            free(it.reg);
         } else {
             uint64_t frame = __atomic_add_fetch(&gfx_counters.frames, 1, __ATOMIC_RELAXED);
             present_image(it.tex, it.has_crop ? it.crop : NULL, it.at, it.queued, frame, it.value);
         }
         plat_mutex_lock(&rl);
+        // Presents only: counting releases and registrations too let r_presents_done run ahead of r_presents_queued,
+        // and the frame bound in vk_be_present stopped holding the game to one frame ahead.
         if (it.kind == RI_SUBMIT) r_submit_done = it.submit_no;
-        else r_presents_done++;
+        else if (it.kind == RI_PRESENT) r_presents_done++;
         r_busy = 0;
         plat_cond_broadcast(&rcv);
     }
@@ -278,7 +294,7 @@ static uint64_t replay_enqueue(ReplayItem *it) {
         wait_counted(DR_FULL, p0);
         core_back_unlocked(&away);
     }
-    it->value = it->kind == RI_RELEASE ? 0 : vk_sync_reserve();   // a release signals nothing
+    it->value = it->kind == RI_SUBMIT || it->kind == RI_PRESENT ? vk_sync_reserve() : 0;   // the others signal nothing
     rq[(rq_head + rq_n) % RQ_CAP] = *it;
     rq_n++;
     plat_cond_broadcast(&rcv);
@@ -330,13 +346,13 @@ void gfx_exit_log(void) {
     if (gfx_replay_async() && r_started && !plat_xchg32(&done, 1)) replay_log(game_frames, 1);
 }
 
-static void vk_be_present(const tex_t *t, const int crop[4], uint64_t at_ns) {
+static uint64_t vk_be_present(const tex_t *t, const int crop[4], uint64_t at_ns) {
     vk_sync_start();
     if (!gfx_replay_async()) {
         uint64_t frame = __atomic_add_fetch(&gfx_counters.frames, 1, __ATOMIC_RELAXED);
         perf_present(frame);   // before vk_exec_frame_log, which resets the frame's exec counts the flight recorder reads
         present_image(t, crop, at_ns, kern_now_ns(), frame, 0);
-        return;
+        return 0;
     }
     // Frame bound: the replay thread handled the previous present before this one is queued.
     plat_mutex_lock(&rl);
@@ -356,7 +372,7 @@ static void vk_be_present(const tex_t *t, const int crop[4], uint64_t at_ns) {
         it.has_crop = 1;
         for (int i = 0; i < 4; i++) it.crop[i] = crop[i];
     }
-    replay_enqueue(&it);
+    return replay_enqueue(&it);
 }
 
 // vk_pipeline.c drops a released program's pipelines here.
@@ -370,8 +386,25 @@ static int vk_be_pool_map_virtual(pool_t *v, int n, const void *requests) {
     vk_present_drain();
     return vk_pool_map_virtual(v, n, requests);
 }
-static void vk_be_texture_register(int id, const tex_t *t, const view_t *v) { vk_sync_start(); vk_texture_register(id, t, v); }
-static void vk_be_sampler_register(int id, const samp_par *s) { vk_sync_start(); vk_sampler_register(id, s); }
+static void vk_be_texture_register(int id, const tex_t *t, const view_t *v) {
+    vk_sync_start();
+    if (!gfx_replay_async()) { vk_texture_register(id, t, v); return; }
+    SlotReg *r = calloc(1, sizeof *r);
+    if (!r) rt_fatal("vk: out of memory (replay queue)");
+    r->t = *t, r->has_v = v != NULL;
+    if (v) r->v = *v;
+    ReplayItem it = {.kind = RI_TEX_REG, .id = id, .reg = r};
+    replay_enqueue(&it);
+}
+static void vk_be_sampler_register(int id, const samp_par *s) {
+    vk_sync_start();
+    if (!gfx_replay_async()) { vk_sampler_register(id, s); return; }
+    SlotReg *r = calloc(1, sizeof *r);
+    if (!r) rt_fatal("vk: out of memory (replay queue)");
+    r->s = *s;
+    ReplayItem it = {.kind = RI_SAMP_REG, .id = id, .reg = r};
+    replay_enqueue(&it);
+}
 // Asynchronous: the release is queued behind the submissions before it, so their replay still resolves the texture's
 // slots to its image (a released slot follows another live texture at the storage), and the ones after it see it
 // released, the order of the synchronous replay. vk_texture_release reads only the object's key fields: a copy.

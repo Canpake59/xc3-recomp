@@ -61,7 +61,123 @@ void vk_exec_frame_written(const tex_t *t) {
     fw[nfw++].n = 1;
 }
 
+// ---- XC3_GPU_PASSES=1: GPU time per kind of pass (diagnostic)
+// A timestamp after all earlier work (bottom of pipe) at each pass's begin and end: end - begin is the pass, begin -
+// the previous end in the same command buffer the work between passes (dispatches, copies, clears). Summed per kind
+// (render area, first colour and depth format) when the submission completes; every 120 frames the costliest kinds.
+#define PT_Q 16384
+typedef struct { uint32_t w, h, c0, d, nc; } PtKey;
+typedef struct { PtKey k; uint64_t ns, gap_ns, n, draws; } PtRow;
+typedef struct { uint32_t qb, qe, qprev; PtKey k; uint32_t draws; } PtRec;
+static int pt_on = -1;
+static VkQueryPool pt_pool;
+static uint32_t pt_next, pt_prev_q = ~0u, pt_draws0;
+static VkCommandBuffer pt_prev_cb;
+static double pt_period;
+static PlatMutex pt_lock = PLAT_MUTEX_INIT;
+static PtRow pt_rows[128];
+static int pt_nrows;
+static uint64_t pt_frames, pt_missed;
+
+static int pt_enabled(void) {
+    if (pt_on >= 0) return pt_on;
+    const char *e = cfg_get("XC3_GPU_PASSES");
+    pt_on = 0;
+    if (!e || *e != '1') return 0;
+    VkCtx *c = vk_ctx();
+    VkQueryPoolCreateInfo qi = {.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP,
+                                .queryCount = PT_Q};
+    if (vkCreateQueryPool(c->device, &qi, NULL, &pt_pool) != VK_SUCCESS) return 0;
+    pt_period = c->props.limits.timestampPeriod;
+    pt_on = 1;
+    rt_log("vk: XC3_GPU_PASSES: GPU time per kind of pass, every 120 frames");
+    return 1;
+}
+
+static uint32_t pt_stamp(VkCommandBuffer cb) {
+    uint32_t q = pt_next++ % PT_Q;
+    vkCmdResetQueryPool(cb, pt_pool, q, 1);
+    vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, pt_pool, q);
+    return q;
+}
+
+static void pt_read(void *arg) {   // completion thread
+    PtRec *r = arg;
+    VkCtx *c = vk_ctx();
+    uint64_t b, e, p = 0;
+    int ok = vkGetQueryPoolResults(c->device, pt_pool, r->qb, 1, 8, &b, 8, VK_QUERY_RESULT_64_BIT) == VK_SUCCESS &&
+             vkGetQueryPoolResults(c->device, pt_pool, r->qe, 1, 8, &e, 8, VK_QUERY_RESULT_64_BIT) == VK_SUCCESS && e >= b;
+    if (ok && r->qprev != ~0u &&
+        (vkGetQueryPoolResults(c->device, pt_pool, r->qprev, 1, 8, &p, 8, VK_QUERY_RESULT_64_BIT) != VK_SUCCESS || p > b))
+        p = b;
+    plat_mutex_lock(&pt_lock);
+    if (!ok) pt_missed++;
+    else {
+        int i = 0;
+        while (i < pt_nrows && memcmp(&pt_rows[i].k, &r->k, sizeof r->k)) i++;
+        if (i == pt_nrows && pt_nrows < 128) memset(&pt_rows[pt_nrows++], 0, sizeof *pt_rows);
+        if (i < pt_nrows) {
+            PtRow *w = &pt_rows[i];
+            w->k = r->k;
+            w->ns += (uint64_t)((double)(e - b) * pt_period);
+            if (r->qprev != ~0u) w->gap_ns += (uint64_t)((double)(b - p) * pt_period);
+            w->n++;
+            w->draws += r->draws;
+        }
+    }
+    plat_mutex_unlock(&pt_lock);
+    free(r);
+}
+
+static void pt_log(uint64_t frame) {
+    if (pt_on != 1) return;
+    plat_mutex_lock(&pt_lock);
+    if (++pt_frames < 120) {
+        plat_mutex_unlock(&pt_lock);
+        return;
+    }
+    PtRow rows[128];
+    int n = pt_nrows;
+    memcpy(rows, pt_rows, sizeof *rows * (size_t)n);
+    uint64_t frames = pt_frames, missed = pt_missed;
+    pt_nrows = 0, pt_frames = 0, pt_missed = 0;
+    plat_mutex_unlock(&pt_lock);
+    uint64_t all = 0, gaps = 0;
+    for (int i = 0; i < n; i++) all += rows[i].ns, gaps += rows[i].gap_ns;
+    for (int i = 0; i < n; i++)   // by pass time plus the gap before it, costliest first
+        for (int j = i + 1; j < n; j++)
+            if (rows[j].ns + rows[j].gap_ns > rows[i].ns + rows[i].gap_ns) { PtRow t = rows[i]; rows[i] = rows[j]; rows[j] = t; }
+    rt_log("gpu passes: frame %llu: per frame %.2f ms in passes, %.2f ms between them, %d kinds, %llu not read",
+           (unsigned long long)frame, all / 1e6 / frames, gaps / 1e6 / frames, n, (unsigned long long)missed);
+    for (int i = 0; i < n && i < 12; i++)
+        rt_log("gpu passes:   %ux%u c%u fmt %u d %u: %.1f per frame, %.3f ms + %.3f ms before, %.0f draws",
+               rows[i].k.w, rows[i].k.h, rows[i].k.nc, rows[i].k.c0, rows[i].k.d, (double)rows[i].n / frames,
+               rows[i].ns / 1e6 / frames, rows[i].gap_ns / 1e6 / frames, (double)rows[i].draws / frames);
+}
+
+static uint32_t pt_begin_q;
+
+static void pt_pass_begin(VkExec *ex) {
+    if (!pt_enabled()) return;
+    pt_begin_q = pt_stamp(ex->cb);
+    pt_draws0 = (uint32_t)vk_exec_frame.draws;
+}
+
+static void pt_pass_end(VkExec *ex) {
+    if (pt_on != 1) return;
+    PtRec *r = malloc(sizeof *r);
+    if (!r) return;
+    r->qb = pt_begin_q;
+    r->qe = pt_stamp(ex->cb);
+    r->qprev = pt_prev_cb == ex->cb ? pt_prev_q : ~0u;
+    r->k = (PtKey){ex->pass_w, ex->pass_h, (uint32_t)ex->pass_color[0], (uint32_t)ex->pass_depth, ex->pass_ncolor};
+    r->draws = (uint32_t)vk_exec_frame.draws - pt_draws0;
+    pt_prev_cb = ex->cb, pt_prev_q = r->qe;
+    vk_completion_add(ex->fence, pt_read, r);
+}
+
 void vk_exec_frame_log(const tex_t *p, uint64_t frame) {
+    pt_log(frame);
     if (!(rt_trace & RT_TRACE_GFX)) return;
     VkExecFrame *f = &vk_exec_frame;
     int hit = 0;
@@ -611,6 +727,7 @@ void vk_exec_pass_begin(VkExec *ex) {
                           .pColorAttachments = ca,
                           .pDepthAttachment = ex->pass_depth ? &da : NULL,
                           .pStencilAttachment = ex->pass_stencil ? &sa : NULL};
+    pt_pass_begin(ex);
     vkCmdBeginRendering(ex->cb, &ri);
     vk_exec_frame.passes++;
     ex->recorded++;
@@ -622,6 +739,7 @@ void vk_exec_pass_end(VkExec *ex) {
     vk_exec_xfb_pause(ex);
     vk_exec_oq_pass_end(ex);
     vkCmdEndRendering(ex->cb);
+    pt_pass_end(ex);
     ex->recorded++;
     ex->in_pass = 0;
     for (int i = 0; i < ex->pass_ncolor && i < 8; i++)   // stand-ins of 3D BC targets go to their textures

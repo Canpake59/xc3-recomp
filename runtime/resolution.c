@@ -96,6 +96,10 @@ static void scene_scale(void) {
 
 int res_scene_on(void) { return R.scale > 0; }
 
+// The scene draws at the full game resolution: upscaler = dlaa when the game started. A switch to dlaa while the game
+// runs cannot give it: the factors scale the scene from its current size (the game's own half), not the frame's.
+int res_scene_whole(void) { return R.scale >= 100; }
+
 
 // World positions projected for the narrowed interface (patches-upd.txt, uifit) spread by the inverse of res_ui_fit.
 static void ui_fit_init(void) {

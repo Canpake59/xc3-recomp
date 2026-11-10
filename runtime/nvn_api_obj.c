@@ -700,6 +700,24 @@ NVN_API(nvnWindowAcquireTexture) {
         sleep_until(at);
         perf_end(PERF_PACE, p0);
     }
+    // With the asynchronous replay the game runs a frame further ahead of the GPU than with the synchronous one. On the
+    // Switch an acquired image means the GPU finished the frame that last presented it, and the game then reuses that
+    // frame's buffers. Answering at once let it rewrite vertex and constant data the GPU was still reading whenever
+    // the GPU fell behind (exploded polygons and coloured shards in v0.2.7 play with XC3_REPLAY_ASYNC=1). So the acquire
+    // waits for that frame here; it only blocks while the GPU is behind.
+    uint64_t done = idx < 4 ? o->done[idx] : 0;
+    if (done && gfx_backend()->fence_done() < done) {
+        uint64_t p0 = perf_begin();
+        uint64_t t0 = kern_now_ns();
+        gfx_backend()->fence_wait(done, 2000000000ull);   // as nvn_api_core.c: a lost GPU does not hang the game
+        perf_end(PERF_FENCE, p0);
+        static int logged;
+        uint64_t ms = (kern_now_ns() - t0) / 1000000;
+        if (ms >= 4 && logged < 8) {
+            logged++;
+            rt_log("nvn: window acquire waited %llu ms for image %d's previous frame on the GPU", (unsigned long long)ms, idx);
+        }
+    }
     // The sync means "the display no longer reads this image". Presents are copies queued in submit order, so it is
     // already satisfied: fenced = 3 with fence 0.
     if (s) {
@@ -725,8 +743,8 @@ NVN_API(nvnQueuePresentTexture) {
     const tex_t *t = (const tex_t *)o->tex[idx];
     uint64_t period = present_period(o), now = kern_now_ns();
     uint64_t slot = now + pace(&o->pace, now, period);
-    gfx_backend()->present(t, o->crop, slot);
-    o->ticket[idx] = o->presents;
+    uint64_t done = gfx_backend()->present(t, o->crop, slot);
+    o->done[idx] = done;
     o->avail[idx] = cfg_bool("XC3_FRAME_QUEUE") ? slot : slot + period;
     frame_step_present(slot, o->interval);   // frame_rate.c: the real-time step follows the display times
     rt_frame_presented(t, o->presents);

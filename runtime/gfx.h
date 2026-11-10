@@ -76,6 +76,7 @@ size_t gfx_shader_warm_list(GfxWarmEnt **out);              // malloc'd; recorde
 const GfxShader *gfx_shader_load_private(const uint8_t iid[32], int *owned);
 void gfx_shader_release_private(const GfxShader *s);
 const uint32_t *gfx_shader_spirv(const GfxShader *s, uint64_t *words);
+uint64_t gfx_shader_spirv_fnv(const GfxShader *s);        // FNV-1a of the SPIR-V bytes, computed once per shader
 uint64_t gfx_shader_failures(void);                         // failed translations; feeds GfxStats.shader_failures
 // Reflection: parsed once per shader from the translator's .res.json and the SPIR-V before it enters the cache.
 enum { GFX_RES_UBO, GFX_RES_SSBO, GFX_RES_TEX, GFX_RES_IMG, GFX_RES_KINDS };
@@ -115,7 +116,8 @@ typedef struct {
     uint64_t (*fence_done)(void);                          // highest value whose side effects are written
     // Queues the present and returns at once; the host present goes out at at_ns (kern_now_ns clock), at once when that
     // has passed or at_ns is 0.
-    void (*present)(const tex_t *t, const int crop[4], uint64_t at_ns);
+    uint64_t (*present)(const tex_t *t, const int crop[4], uint64_t at_ns);   // the timeline value the present signals
+                                                           // once its frame is done (asynchronous replay), else 0
     void (*finish)(void);
     void (*read_texels)(const tex_t *t, const view_t *v, const NVNcopyRegion *r, uint8_t *dst, uint64_t row, uint64_t img);
     void (*write_texels)(const tex_t *t, const view_t *v, const NVNcopyRegion *r, const uint8_t *src, uint64_t row, uint64_t img);
