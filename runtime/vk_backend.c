@@ -344,13 +344,13 @@ void gfx_exit_log(void) {
     if (gfx_replay_async() && r_started && !plat_xchg32(&done, 1)) replay_log(game_frames, 1);
 }
 
-static void vk_be_present(const tex_t *t, const int crop[4], uint64_t at_ns) {
+static uint64_t vk_be_present(const tex_t *t, const int crop[4], uint64_t at_ns) {
     vk_sync_start();
     if (!gfx_replay_async()) {
         uint64_t frame = __atomic_add_fetch(&gfx_counters.frames, 1, __ATOMIC_RELAXED);
         perf_present(frame);   // before vk_exec_frame_log, which resets the frame's exec counts the flight recorder reads
         present_image(t, crop, at_ns, kern_now_ns(), frame, 0);
-        return;
+        return 0;
     }
     // Frame bound: the replay thread handled the previous present before this one is queued.
     plat_mutex_lock(&rl);
@@ -370,7 +370,7 @@ static void vk_be_present(const tex_t *t, const int crop[4], uint64_t at_ns) {
         it.has_crop = 1;
         for (int i = 0; i < 4; i++) it.crop[i] = crop[i];
     }
-    replay_enqueue(&it);
+    return replay_enqueue(&it);
 }
 
 // vk_pipeline.c drops a released program's pipelines here.
