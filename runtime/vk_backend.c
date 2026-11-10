@@ -11,7 +11,7 @@
 // the frame's display time from the pacer (nvn_api_obj.c), so present-to-present intervals stay even whatever the
 // replay took. The blit is already on the queue, so the wait blocks no submission.
 //
-// Asynchronous replay (XC3_REPLAY_ASYNC=1; default 0, which replays on the submitting thread): nvnQueueSubmitCommands
+// Asynchronous replay (XC3_REPLAY_ASYNC=1, the default; 0 replays on the submitting thread): nvnQueueSubmitCommands
 // and nvnQueuePresentTexture only queue. Each item gets its timeline value at enqueue (vk_sync_reserve), in queue
 // order; the replay thread runs the synchronous submit and present bodies in that order, so every value is signalled
 // by the submission it was handed out for. The game runs at most one frame ahead: queueing present N waits until the
@@ -178,10 +178,12 @@ static uint64_t ck_reads, ck_diff, ck_diff_unexplained, ck_diff_idle;
 int vk_replay_async(void) {
     static int on = -1;
     if (on < 0) {
-        // Off by default. On, it cut the frames over 25 ms at 4K/120 on a 9800X3D (about 78 to 58 a minute), but in
-        // play on an RTX 5090 it corrupts the 3D scene while the camera turns: flat blue, yellow or green scenes and
-        // stretched geometry for many frames, the interface intact (v0.1.7). Scripted runs with in-game captures did
-        // not show it. Off, the same play is clean.
+        // On by default. The render thread spends about 46 % of a frame replaying; here that runs beside the game's
+        // next frame. Walking in a busy field at 4K on a 9800X3D and RTX 5090 (frame generation off), frames took 10.5
+        // to 12 ms on the submitting thread and held the 120 Hz VRR cap (8.6 ms) here; without a cap, 7.5 to 8.1 ms.
+        // Releases up to 0.2.7 corrupted the scene while the camera turned: slot registrations took effect before the
+        // queued frames (RI_TEX_REG above) and the window acquire let the game reuse buffers the GPU still read
+        // (nvn_api_obj.c nvnWindowAcquireTexture). Play since those fixes is clean.
         on = cfg_bool("XC3_REPLAY_ASYNC");
         rt_log("vk: replay %s (XC3_REPLAY_ASYNC=%d)",
                on ? "on its own thread, at most one frame behind the game" : "on the submitting thread", on);
