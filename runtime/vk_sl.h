@@ -40,8 +40,9 @@ PFN_vkVoidFunction vk_sl_proc(VkDevice dev, const char *name);   // Streamline's
 // Streamline's proxy of an instance function while DLSS Frame Generation is wanted (the window's surface), or NULL.
 PFN_vkVoidFunction vk_sl_instance_proc(VkInstance inst, const char *name);
 // Records DLSS for frame id (vk_fg_frame): colour, depth (R32F, 0 near, 1 at infinity), motion (RG16F UV offsets to
-// the previous frame) at the render size, out at the output size; jitter in render pixels. dlaa: the render size is
-// the output size. The depth and motion tags serve DLSS Frame Generation too.
+// the previous frame) at the render size, out at the output size; jitter in render pixels. dlaa: DLAA was asked for
+// (the mode still follows the render share; a smaller scene is logged). The depth and motion tags serve DLSS Frame
+// Generation too.
 int vk_sl_evaluate(VkCommandBuffer cb, uint64_t id, const VkSlImage *color, const VkSlImage *depth,
                    const VkSlImage *motion, const VkSlImage *out, const float jitter[2], float near_z, float fov_y,
                    int reset, int dlaa);

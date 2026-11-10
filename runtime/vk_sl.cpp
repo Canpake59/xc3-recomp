@@ -530,9 +530,18 @@ extern "C" int vk_sl_evaluate(VkCommandBuffer cb, uint64_t id, const VkSlImage *
 
     sl::DLSSOptions o{};
     // The mode whose render share is nearest the one in use: DLAA 1, quality 2/3, balanced 0.58, performance 1/2,
-    // ultra performance 1/3.
+    // ultra performance 1/3. dlaa asks for 1:1, which the scene gives only when upscaler = dlaa at start
+    // (resolution.c scene_scale); after a switch to it while the game runs the scene stays at the game's half size,
+    // and DLAA's mode on that input upscaled it 2x under the wrong mode and name. The share decides there too.
     float share = (float)color->w / (float)out->w;
-    o.mode = dlaa || share > 0.83f ? sl::DLSSMode::eDLAA
+    if (dlaa && share <= 0.83f) {
+        static int logged;
+        if (!logged++)
+            rt_log("vk: DLAA asked, but the scene draws at %ux%u of %ux%u: it draws whole only with upscaler = dlaa "
+                   "at start (a restart)",
+                   color->w, color->h, out->w, out->h);
+    }
+    o.mode = share > 0.83f ? sl::DLSSMode::eDLAA
              : share > 0.62f         ? sl::DLSSMode::eMaxQuality
              : share > 0.54f         ? sl::DLSSMode::eBalanced
              : share > 0.42f         ? sl::DLSSMode::eMaxPerformance

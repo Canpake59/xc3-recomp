@@ -555,7 +555,10 @@ int vk_tup_record(VkCommandBuffer cb, const VkTupFrame *f) {
     T.frames++;
     if (T.logged_mode != mode) {
         T.logged_mode = mode;
-        rt_log("vk: %s runs in place of the game's reconstruction, %ux%u to %ux%u", mode_name(mode), rw, rh, ow, oh);
+        const char *u = cfg_value("XC3_UPSCALER");
+        int asked_sl = !strcmp(u, "dlss") || !strcmp(u, "dlaa");
+        rt_log("vk: %s runs in place of the game's reconstruction, %ux%u to %ux%u%s", mode_name(mode), rw, rh, ow, oh,
+               mode == VK_TUP_FSR3 && asked_sl ? " (DLSS and DLAA need Streamline, which only starts with the game)" : "");
     }
     return 1;
 }

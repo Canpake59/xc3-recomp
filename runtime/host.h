@@ -256,6 +256,7 @@ int res_heapdef_build(const void *in, size_t n, void **out, size_t *out_n);   //
                                                            // the grown heaps, malloc'd; 0 = cannot (logged)
 void res_heapdef_served(void);                             // romfs.c serves the grown table
 int res_scene_on(void);                                    // the scaled-scene path is on (render_scale, dlaa)
+int res_scene_whole(void);                                 // the scene draws at the full game resolution (dlaa at start)
 float res_ui_fit(void);                                    // horizontal scale of the interface, 1 at 16:9 or narrower
 void res_init(void);                                       // after rt_patches_init: the patch page and the sets
 void res_sizes(unsigned out[2], unsigned scene[2]);      // the output and scene sizes in effect (the game's own
