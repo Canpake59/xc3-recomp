@@ -129,19 +129,12 @@ static int knob(const char *key) {   // test keys, unset by default
     return v && *v && strcmp(v, "0");
 }
 
-static uint64_t spirv_hash(const GfxShader *s) {
-    uint64_t words = 0, h = 0xcbf29ce484222325ull;
-    const uint8_t *b = (const uint8_t *)gfx_shader_spirv(s, &words);
-    for (uint64_t i = 0; b && i < words * 4; i++) h = (h ^ b[i]) * 0x100000001b3ull;
-    return h;
-}
-
+// Called for every draw's fragment shader: the hash is kept on the shader (gfx_shader_spirv_fnv), so a draw costs a
+// few compares. A 256-entry memo keyed by the shader pointer used to sit here; a town's few thousand fragment shaders
+// kept evicting each other, and most draws hashed their SPIR-V again.
 int vk_tup_role(const GfxShader *fs) {
-    static struct { const GfxShader *s; int role; } memo[256];
     if (!fs) return VK_TUP_NONE;
-    unsigned i = (unsigned)(((uintptr_t)fs * 0x9E3779B97F4A7C15ull) >> 56);
-    if (memo[i].s == fs) return memo[i].role;
-    uint64_t h = spirv_hash(fs);
+    uint64_t h = gfx_shader_spirv_fnv(fs);
     int role = VK_TUP_NONE;
     for (int r = 1; r < VK_TUP_ROLES; r++)
         if (h == ROLE_HASH[r]) role = r;
@@ -158,7 +151,6 @@ int vk_tup_role(const GfxShader *fs) {
             rt_log("vk: temporal upscale: the game's reconstruction draw %d found (fragment shader %016llx)", role,
                    (unsigned long long)h);
     }
-    memo[i].s = fs, memo[i].role = role;
     return role;
 }
 

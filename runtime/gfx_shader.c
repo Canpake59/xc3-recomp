@@ -87,6 +87,7 @@ struct GfxShader {
     uint32_t in_mask, out_mask;                            // user Locations of Input / Output variables
     GfxShaderIo in[32], out[32];
     uint32_t local[3];
+    volatile uint64_t spirv_fnv;                           // gfx_shader_spirv_fnv, 0 until first asked for
 };
 
 static PlatMutex cache_lock = PLAT_MUTEX_INIT;                  // memory cache
@@ -1787,6 +1788,20 @@ void gfx_shader_prewarm(const uint8_t (*iids)[32], size_t n, const GfxShader **o
 const uint32_t *gfx_shader_spirv(const GfxShader *s, uint64_t *words) {
     if (words) *words = s->words;
     return s->spirv;
+}
+
+// FNV-1a over the SPIR-V bytes, computed on the first call and kept on the shader: vk_tup.c vk_tup_role asks it for
+// every draw's fragment shader, and hashing the words again per draw cost a fifth of the render thread in a town.
+// Racing first calls compute the same value.
+uint64_t gfx_shader_spirv_fnv(const GfxShader *s) {
+    uint64_t h = __atomic_load_n(&s->spirv_fnv, __ATOMIC_RELAXED);
+    if (h) return h;
+    h = 0xcbf29ce484222325ull;
+    const uint8_t *b = (const uint8_t *)s->spirv;
+    for (uint64_t i = 0; b && i < s->words * 4; i++) h = (h ^ b[i]) * 0x100000001b3ull;
+    if (!h) h = 1;
+    __atomic_store_n(&((GfxShader *)s)->spirv_fnv, h, __ATOMIC_RELAXED);
+    return h;
 }
 
 int gfx_shader_stage(const GfxShader *s) { return s->stage; }
