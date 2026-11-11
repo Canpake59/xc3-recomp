@@ -29,7 +29,7 @@ Report problems as issues, following [CONTRIBUTING.md](CONTRIBUTING.md).
 - In-game settings menu (F1) and performance overlay (F10)
 - Keyboard, mouse and gamepad, with Xbox or PlayStation button prompts
 - 60 fps and above (`fps_limit` up to 360 or the display's rate)
-- Any game resolution and aspect ratio, including ultrawide (`output_res`)
+- Any game resolution and aspect ratio, including ultrawide 21:9 and 32:9 (`output_res`, `ui_fit`)
 - Upscaling and anti-aliasing (`upscaler`): NVIDIA DLSS and DLAA on RTX cards, AMD FSR 3 on any GPU, each in place of
   the game's own temporal reconstruction, with `render_scale` setting the share of the resolution the 3D scene draws
   in; FSR 1 for a window larger than the game resolution

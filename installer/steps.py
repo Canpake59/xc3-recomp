@@ -721,6 +721,19 @@ PREPARE_LINE = re.compile(r'prepare: (\d+) of (\d+) pairs')
 WARM_START = 'prepare-shaders: '
 
 
+def xlate_identity(exe):
+    """The translator identity runtime/gfx_shader.c (xlate_identity) mixes into every shader cache key: the 64 hex
+    digits of the .id beside the exe (tools/build_xlate.py, a hash of the translator's sources), else the exe's sha256.
+    XC3_XLATE_ID overrides it in the game only, which the setup never sets."""
+    try:
+        text = exe.with_suffix('.id').read_text(encoding='ascii').strip()
+        if len(text) == 64 and all(c in '0123456789abcdefABCDEF' for c in text):
+            return text.lower()
+    except (OSError, UnicodeDecodeError):
+        pass
+    return file_sha256(exe)
+
+
 class Prepare(Step):
     """Puts the shader translator beside xc3.exe, then translates every shader in the player's archives ahead of play
     (tools/prepare_shaders.py). A failure there leaves the game playable, with shaders translated on first use, so it
@@ -744,8 +757,11 @@ class Prepare(Step):
         layout, dest, rep = ctx.layout, ctx.dest, ctx.reporter
         rep.progress('prepare', 'translator', force=True)
         xlate = dest / XLATE
-        if xlate.is_file() and file_sha256(xlate) != file_sha256(layout.xlate):
-            remove(dest / 'shader-cache')   # another translator: its cache keys differ, the old ones only take space
+        # Another translator identity: its cache keys differ, the old entries only take space. The identity, not the
+        # exe's bytes: each release builds the translator again and NativeAOT output differs from build to build, so
+        # comparing the exe wiped a cache every new exe would still hit (issue 30: a full re-translation per update).
+        if xlate.is_file() and xlate_identity(xlate) != xlate_identity(layout.xlate):
+            remove(dest / 'shader-cache')
         replace_file(layout.xlate, xlate)
         xlate_id = layout.xlate.with_suffix('.id')
         if xlate_id.is_file():
