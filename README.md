@@ -67,10 +67,12 @@ To update, run a newer `XC3-Setup.exe` on the same folder; saves and settings ar
 
 ## Mods
 
-Mods made for Switch emulators or Atmosphere work when their `romfs` folder is under a `mods` folder next to `xc3.exe`:
-unpack each mod into its own folder, such as `mods\My Mod\romfs\...`. The `atmosphere\contents\<title id>\romfs` layout of
-an SD card works too (the `romfs` folder is found up to four levels down). Restart the game after adding a mod. When two
-mods change the same file, the first by folder name wins.
+Mods made for Switch emulators or Atmosphere work when their `romfs` folder is under a `mods` folder next to `xc3.exe`.
+Any folder named `romfs` found up to four levels down counts as one mod, and the names of the folders above it do not
+matter, so `mods\My Mod\romfs\...` and the `atmosphere\contents\<title id>\romfs` layout of an SD card both work.
+Giving each mod its own folder is the easy way to keep them apart: moving a folder away turns that mod off, and when two
+mods provide the same file, the one whose folder path sorts first wins. A `romfs` folder directly in `mods` works too,
+but everything in it counts as one mod. Restart the game after adding or removing a mod.
 
 Mods that need the [xcnx-file-loader](https://github.com/RoccoDev/xcnx-file-loader) plugin, such as the Ultimate
 Rebalance mod, work without it: they replace files that the game normally reads from its archive (`bf3.ard`), and the
