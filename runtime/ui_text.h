@@ -77,7 +77,7 @@ typedef enum {
     UI_MENU_LSTICK_DEADZONE, UI_MENU_RSTICK_DEADZONE, UI_MENU_STICK_DEADZONE_DESC, UI_MENU_STICK_DEADZONE_NOW,
 
     // Controls tab: the remapping rows (ui/binds_page.cpp)
-    UI_BINDS_HELP, UI_BINDS_COL_KEY1, UI_BINDS_COL_KEY2, UI_BINDS_COL_PAD,
+    UI_BINDS_HELP, UI_BINDS_COL_KEY1, UI_BINDS_COL_KEY2, UI_BINDS_COL_PAD, UI_BINDS_COL_PAD2,
     UI_BINDS_GROUP_BUTTONS, UI_BINDS_GROUP_MOVE, UI_BINDS_GROUP_CAMERA,
     UI_BINDS_PRESS_KEY,       // "Press a key or mouse button for %s"
     UI_BINDS_PRESS_PAD,       // "Press a controller button for %s"

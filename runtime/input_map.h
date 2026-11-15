@@ -104,10 +104,14 @@ int input_map_pads_of(const InputMap *m, int action, int layout, uint8_t *out, i
 // Key slot (0 or 1) of action becomes key; KEY_NONE clears the slot. A key another action has moves here: returns that
 // action, -1 when none lost it.
 int input_map_set_key(InputMap *m, int action, int slot, int key);
-// action's gamepad button in layout becomes pad; PAD_NONE clears it. The action that had pad takes action's old button
-// (a swap): returns it, -1 when none. A remapped button is physical, so the face buttons (A B X Y) and the changed actions
-// get the result in every layout: the layout setting no longer moves them. A change that puts every button of layout
-// back at its default restores the defaults of every layout instead.
+// Gamepad slot (0 or 1) of action in layout becomes pad; PAD_NONE clears the slot (a button in slot 1 then moves to
+// slot 0). Slot 0 is the action's main button: the action that had pad takes action's old slot 0 button (a swap). Slot 1
+// is an extra button: the action that had pad just loses it. Either way returns that action, -1 when none. A remapped
+// button is physical, so the face buttons (A B X Y) and the changed actions get the result in every layout: the layout
+// setting no longer moves them. A change that puts every button of layout back at its default restores the defaults of
+// every layout instead.
+int input_map_set_pad_slot(InputMap *m, int action, int layout, int slot, int pad);
+// input_map_set_pad_slot of slot 0.
 int input_map_set_pad(InputMap *m, int action, int layout, int pad);
 // The bind_ value that gives action its bindings of m: "" when they are the defaults (no line needed), else the entries,
 // with key:default / pad:default for a part at its defaults, or "none".

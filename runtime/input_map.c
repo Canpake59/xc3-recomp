@@ -214,22 +214,32 @@ static int pads_at_defaults(const InputMap *m, int layout) {
     return 1;
 }
 
-int input_map_set_pad(InputMap *m, int action, int layout, int pad) {
+int input_map_set_pad_slot(InputMap *m, int action, int layout, int slot, int pad) {
     uint8_t mine[INPUT_PAD_BINDING_MAX];
     int n = input_map_pads_of(m, action, layout, mine, INPUT_PAD_BINDING_MAX), other = -1;
     if (pad != PAD_NONE)
         for (int i = 0; i < m->npads[layout]; i++)
             if (m->pads[layout][i].pad == pad && m->pads[layout][i].action != action) other = m->pads[layout][i].action;
-    if (other >= 0) {   // the other action gives up pad and takes this action's old button
+    if (other >= 0) {   // the other action gives up pad; for the main slot it takes this action's old main button
         uint8_t list[INPUT_PAD_BINDING_MAX];
         int c = 0;
         for (int i = 0; i < m->npads[layout]; i++)
             if (m->pads[layout][i].action == other && m->pads[layout][i].pad != pad) list[c++] = m->pads[layout][i].pad;
-        if (n && mine[0] != pad && c < INPUT_PAD_BINDING_MAX) list[c++] = mine[0];
+        if (slot == 0 && n && mine[0] != pad && c < INPUT_PAD_BINDING_MAX) list[c++] = mine[0];
         pads_put(m, layout, other, list, c);
     }
-    uint8_t p = (uint8_t)pad;
-    pads_put(m, layout, action, &p, pad != PAD_NONE);
+    if (pad != PAD_NONE) {
+        int w = 0;   // the button once in this action's list too
+        for (int i = 0; i < n; i++)
+            if (mine[i] != pad) mine[w++] = mine[i];
+        n = w;
+        if (slot < n) mine[slot] = (uint8_t)pad;
+        else if (n < INPUT_PAD_BINDING_MAX) mine[n++] = (uint8_t)pad;
+    } else if (slot < n) {
+        memmove(mine + slot, mine + slot + 1, (size_t)(n - slot - 1));
+        n--;
+    }
+    pads_put(m, layout, action, mine, n);
     if (pads_at_defaults(m, layout)) {   // put back as it was: the layout setting moves the face buttons again
         memcpy(m->pads, defaults.pads, sizeof m->pads);
         memcpy(m->npads, defaults.npads, sizeof m->npads);
@@ -243,6 +253,10 @@ int input_map_set_pad(InputMap *m, int action, int layout, int pad) {
             if (l != layout) pads_put(m, l, pin[i], list, c);
     }
     return other;
+}
+
+int input_map_set_pad(InputMap *m, int action, int layout, int pad) {
+    return input_map_set_pad_slot(m, action, layout, 0, pad);
 }
 
 // The same bindings in any order (the menu appends; a line lists them its own way).

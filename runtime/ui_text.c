@@ -186,8 +186,10 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_STICK_DEADZONE_NOW] = "stick now: %.0f %%",
 
     [UI_BINDS_HELP] = "Select a cell and press A or Enter, then the key, mouse button or controller button. Delete or "
-                      "X clears a cell. A key in use moves here; a controller button swaps with the one it replaces.",
-    [UI_BINDS_COL_KEY1] = "Key 1", [UI_BINDS_COL_KEY2] = "Key 2", [UI_BINDS_COL_PAD] = "Controller",
+                      "X clears a cell. A key in use moves here; in Controller 1 a button swaps with the one it replaces, "
+                      "in Controller 2 it is added as a second button and taken from where it was.",
+    [UI_BINDS_COL_KEY1] = "Key 1", [UI_BINDS_COL_KEY2] = "Key 2", [UI_BINDS_COL_PAD] = "Controller 1",
+    [UI_BINDS_COL_PAD2] = "Controller 2",
     [UI_BINDS_GROUP_BUTTONS] = "Buttons", [UI_BINDS_GROUP_MOVE] = "Movement", [UI_BINDS_GROUP_CAMERA] = "Camera",
     [UI_BINDS_PRESS_KEY] = "Press a key or mouse button for %s",
     [UI_BINDS_PRESS_PAD] = "Press a controller button for %s",
@@ -491,9 +493,11 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_STICK_DEADZONE_NOW] = "стик сейчас: %.0f %%",
 
     [UI_BINDS_HELP] = "Выберите ячейку и нажмите A или Enter, затем клавишу, кнопку мыши или кнопку контроллера. "
-                      "Delete или X очищает ячейку. Занятая клавиша переходит сюда; кнопка контроллера меняется "
-                      "местами с той, которую заменяет.",
-    [UI_BINDS_COL_KEY1] = "Клавиша 1", [UI_BINDS_COL_KEY2] = "Клавиша 2", [UI_BINDS_COL_PAD] = "Контроллер",
+                      "Delete или X очищает ячейку. Занятая клавиша переходит сюда; в «Контроллер 1» кнопка меняется "
+                      "местами с той, которую заменяет, в «Контроллер 2» она добавляется второй кнопкой и убирается "
+                      "оттуда, где была.",
+    [UI_BINDS_COL_KEY1] = "Клавиша 1", [UI_BINDS_COL_KEY2] = "Клавиша 2", [UI_BINDS_COL_PAD] = "Контроллер 1",
+    [UI_BINDS_COL_PAD2] = "Контроллер 2",
     [UI_BINDS_GROUP_BUTTONS] = "Кнопки", [UI_BINDS_GROUP_MOVE] = "Движение", [UI_BINDS_GROUP_CAMERA] = "Камера",
     [UI_BINDS_PRESS_KEY] = "Нажмите клавишу или кнопку мыши для «%s»",
     [UI_BINDS_PRESS_PAD] = "Нажмите кнопку контроллера для «%s»",

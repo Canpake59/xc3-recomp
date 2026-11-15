@@ -35,7 +35,7 @@ static const int kMove[] = {B_SL_UP, B_SL_DOWN, B_SL_LEFT, B_SL_RIGHT};
 static const int kCamera[] = {B_SR_UP, B_SR_DOWN, B_SR_LEFT, B_SR_RIGHT};
 
 static struct {
-    int action = -1, cell;   // the cell waiting for a press (0, 1 keys, 2 the controller); action -1 none
+    int action = -1, cell;   // the cell waiting for a press (0, 1 keys, 2, 3 the controller); action -1 none
     bool reset;              // the next capture poll takes what is held as the start
     uint64_t start, done;    // plat_now_ns of the start and of the press, timeout or Esc (0 still waiting)
 } g_cap;
@@ -131,7 +131,7 @@ static void set_note(int action, UiTextId fmt, const char *a, const char *b) {
     g_note_until = plat_now_ns() + 5000000000ull;
 }
 
-// cell 0, 1: a key (KEY_NONE clears it); 2: a gamepad button (PAD_NONE clears it).
+// cell 0, 1: a key (KEY_NONE clears it); 2: the main gamepad button, 3: an extra one (PAD_NONE clears it).
 static void change(int action, int cell, int id) {
     InputMap m;
     input_map_snapshot(&m);
@@ -140,8 +140,9 @@ static void change(int action, int cell, int id) {
         int lost = input_map_set_key(&m, action, cell, id);
         if (lost >= 0) set_note(action, UI_BINDS_TAKEN, key_label(id, buf, sizeof buf), action_label(lost));
     } else {
-        int other = input_map_set_pad(&m, action, shown_layout(), id);
-        if (other >= 0) set_note(action, UI_BINDS_SWAPPED, action_label(action), action_label(other));
+        int other = input_map_set_pad_slot(&m, action, shown_layout(), cell - 2, id);
+        if (other >= 0 && cell == 2) set_note(action, UI_BINDS_SWAPPED, action_label(action), action_label(other));
+        if (other >= 0 && cell == 3) set_note(action, UI_BINDS_TAKEN, pad_label(id), action_label(other));
     }
     write_lines(&m);
 }
@@ -164,17 +165,19 @@ static void row_action(int a, const InputMap &m, int layout) {
     int nk = input_map_keys_of(&m, a, k, INPUT_BINDING_MAX);
     int np = a < B_SL_LEFT ? input_map_pads_of(&m, a, layout, p, INPUT_PAD_BINDING_MAX) : 0;
     char b0[48], b1[48];
-    const char *cells[3] = {nk > 0 ? key_label(k[0], b0, sizeof b0) : "", nk > 1 ? key_label(k[1], b1, sizeof b1) : "",
-                            a >= B_SL_LEFT ? menu_text(a <= B_SL_DOWN ? UI_PAD_LSTICK : UI_PAD_RSTICK)
-                            : np           ? pad_label(p[0])
-                                           : ""};
-    const bool enabled[3] = {true, true, a < B_SL_LEFT};   // the sticks stay sticks
+    const char *cells[BIND_CELLS] = {nk > 0 ? key_label(k[0], b0, sizeof b0) : "",
+                                     nk > 1 ? key_label(k[1], b1, sizeof b1) : "",
+                                     a >= B_SL_LEFT ? menu_text(a <= B_SL_DOWN ? UI_PAD_LSTICK : UI_PAD_RSTICK)
+                                     : np           ? pad_label(p[0])
+                                                    : "",
+                                     np > 1 ? pad_label(p[1]) : ""};
+    const bool enabled[BIND_CELLS] = {true, true, a < B_SL_LEFT, a < B_SL_LEFT};   // the sticks stay sticks
     char key[32];
     snprintf(key, sizeof key, "BIND_%s", input_action_name(a));
     const char *note = g_note_action == a && plat_now_ns() < g_note_until ? g_note : nullptr;
     int r = opt_bind_row(key, action_label(a), action_desc(a), cells, enabled, note);
     if (g_cap.action >= 0 || r < 0) return;
-    if (r < 3) {
+    if (r < BIND_CELLS) {
         g_cap.action = a;
         g_cap.cell = r;
         g_cap.reset = true;
@@ -191,7 +194,7 @@ static void capture_window(void) {
     if (g_cap.action < 0) return;
     if (!ImGui::IsPopupOpen("##bind_capture")) ImGui::OpenPopup("##bind_capture");
     uint64_t now = plat_now_ns();
-    bool pad_cell = g_cap.cell == 2;
+    bool pad_cell = g_cap.cell >= 2;
     if (!g_cap.done) {
         int id = 0, got = input_capture(g_cap.reset, &id);
         g_cap.reset = false;
@@ -230,7 +233,8 @@ void binds_rows(float scale) {
     int layout = shown_layout();
     opt_group(UI_BINDS_GROUP_BUTTONS);
     opt_text(UI_BINDS_HELP);
-    opt_bind_header(UI_BINDS_COL_KEY1, UI_BINDS_COL_KEY2, UI_BINDS_COL_PAD);
+    static const UiTextId cols[BIND_CELLS] = {UI_BINDS_COL_KEY1, UI_BINDS_COL_KEY2, UI_BINDS_COL_PAD, UI_BINDS_COL_PAD2};
+    opt_bind_header(cols);
     for (int a : kButtons) row_action(a, m, layout);
     opt_group(UI_BINDS_GROUP_MOVE);
     for (int a : kMove) row_action(a, m, layout);
