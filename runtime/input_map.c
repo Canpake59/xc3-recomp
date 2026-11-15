@@ -44,7 +44,8 @@ static const char *const action_names[ACTION_COUNT] = {
     "LSTICK_LEFT", "LSTICK_UP", "LSTICK_RIGHT", "LSTICK_DOWN", "RSTICK_LEFT", "RSTICK_UP", "RSTICK_RIGHT", "RSTICK_DOWN"};
 static const char *const pad_names[PAD_COUNT] = {
     NULL, "south", "east", "west", "north", "lstick", "rstick", "l", "r", "start", "back",
-    "dpad_left", "dpad_up", "dpad_right", "dpad_down", "zl", "zr"};
+    "dpad_left", "dpad_up", "dpad_right", "dpad_down", "zl", "zr", "lpaddle1", "rpaddle1", "lpaddle2", "rpaddle2",
+    "touchpad"};
 static const char *const key_names[KEY_COUNT] = {   // each group starts at its id; the ids of a group are consecutive
     [KEY_A] = "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u",
     "v", "w", "x", "y", "z",
@@ -355,4 +356,22 @@ int input_menu_gate(int *held, int menu_open, uint64_t *buttons, int32_t sticks[
 // Game Mode). The same latch as the menu's above; the game sees neither click while it holds.
 int input_overlay_gate(int *held, uint64_t *buttons) {
     return chord(held, buttons, 1ull << B_STICK_L | 1ull << B_STICK_R);
+}
+
+void input_pad_stick(int32_t x, int32_t y, float dead, int32_t out[2]) {
+    double fx = x / (double)STICK_MAX, fy = y / (double)STICK_MAX, m = sqrt(fx * fx + fy * fy);
+    out[0] = out[1] = 0;
+    if (m <= dead) return;
+    double k = ((m > 1 ? 1 : m) - dead) / (1 - dead) / m;   // past the edge (a square gate's corner) the length is 1
+    out[0] = (int32_t)lrint(fmax(-1, fmin(1, fx * k)) * STICK_MAX);
+    out[1] = (int32_t)lrint(fmax(-1, fmin(1, fy * k)) * STICK_MAX);
+}
+
+float input_pad_deadzone(int stick) {
+    double v = cfg_double(stick ? "XC3_RSTICK_DEADZONE" : "XC3_LSTICK_DEADZONE");
+    return (float)(v < 0 ? 0 : v > 50 ? 50 : v) / 100.f;
+}
+
+double input_stick_percent(int32_t x, int32_t y) {
+    return sqrt((double)x * x + (double)y * y) * 100.0 / STICK_MAX;
 }

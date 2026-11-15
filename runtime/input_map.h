@@ -34,11 +34,16 @@ enum {
 };
 
 // Gamepad inputs by position (Nintendo layout, as SDL names them), platform-neutral like the key ids. ZL and ZR are the
-// analog triggers; input_win.c translates SDL buttons and axes to these (one place).
+// analog triggers; input_win.c translates SDL buttons and axes to these (one place). The paddles are the back buttons
+// of an Xbox Elite, DualSense Edge or Steam Controller (SDL's LEFT_PADDLE1 and so on), the touchpad is the click of a
+// DualSense or DualShock 4 touchpad (SDL's TOUCHPAD); no Switch button has them by default, a bind line or the
+// remapping rows add them. A pad without one never reports it held. (Paddles and touchpad from totk-pc-recomp, MIT,
+// Copyright (c) 2026 Valiantsin Dzerakh.)
 enum {
     PAD_NONE = 0,
     PAD_SOUTH, PAD_EAST, PAD_WEST, PAD_NORTH, PAD_LSTICK, PAD_RSTICK, PAD_L, PAD_R, PAD_START, PAD_BACK,
     PAD_DPAD_LEFT, PAD_DPAD_UP, PAD_DPAD_RIGHT, PAD_DPAD_DOWN, PAD_ZL, PAD_ZR,
+    PAD_LPADDLE1, PAD_RPADDLE1, PAD_LPADDLE2, PAD_RPADDLE2, PAD_TOUCHPAD,
     PAD_COUNT
 };
 
@@ -107,3 +112,13 @@ int input_map_set_pad(InputMap *m, int action, int layout, int pad);
 // The bind_ value that gives action its bindings of m: "" when they are the defaults (no line needed), else the entries,
 // with key:default / pad:default for a part at its defaults, or "none".
 void input_map_line(const InputMap *m, int action, char *out, size_t n);
+
+// A gamepad stick (SDL's axis values, y up) through a round dead zone `dead` (a fraction of full deflection, 0..0.5):
+// inside it the stick is centred, outside it the deflection is rescaled so the edge of the dead zone is 0 and the rim
+// full, keeping the direction. From totk-pc-recomp (MIT, Copyright (c) 2026 Valiantsin Dzerakh).
+void input_pad_stick(int32_t x, int32_t y, float dead, int32_t out[2]);
+// The dead zone of gamepad stick 0 (left) or 1 (right) for input_pad_stick, as a fraction of full deflection:
+// XC3_LSTICK_DEADZONE / XC3_RSTICK_DEADZONE, percent clamped to 0..50.
+float input_pad_deadzone(int stick);
+// How far a stick is from its centre, in percent of full deflection (100 at the rim).
+double input_stick_percent(int32_t x, int32_t y);

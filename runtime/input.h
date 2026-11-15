@@ -56,6 +56,10 @@ uint16_t rumble_motor(float a, float curve, float strength);
 // XC3_RUMBLE_TRIGGERS=1: input_rumble also drives the impulse triggers (Xbox) with the high motor's value.
 int input_rumble_triggers_enabled(void);
 
+// The gamepad's stick deflections before the dead zone, percent of full (left, right), for the menu: 1, or 0 without a
+// connected gamepad. Any thread.
+int input_pad_stick_percent(double pct[2]);
+
 // Motion (XC3_MOTION=0 turns it off, live). input_motion_start starts the sensor thread once: every 4 ms it reads the
 // gamepad's gyro and accelerometer (when it has them) and feeds motion_global(). Callable from any thread.
 void input_motion_start(void);

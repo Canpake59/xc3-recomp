@@ -25,7 +25,7 @@
 #include "vk.h"
 #include "platform/platform.h"
 
-enum { STICK_MAX = 32767, STICK_DEAD = 2500, STICK_DIR = 16384, TRIGGER_ON = 16384, RESCAN_MS = 1000 };
+enum { STICK_MAX = 32767, STICK_DIR = 16384, TRIGGER_ON = 16384, RESCAN_MS = 1000 };
 
 static PlatMutex lock = PLAT_MUTEX_INIT;
 static int state;                    // 0 not started, 1 running, -1 disabled or SDL failed
@@ -55,6 +55,9 @@ static const SDL_GamepadButton pad_sdl[PAD_COUNT] = {
     [PAD_R] = SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, [PAD_START] = SDL_GAMEPAD_BUTTON_START, [PAD_BACK] = SDL_GAMEPAD_BUTTON_BACK,
     [PAD_DPAD_LEFT] = SDL_GAMEPAD_BUTTON_DPAD_LEFT, [PAD_DPAD_UP] = SDL_GAMEPAD_BUTTON_DPAD_UP,
     [PAD_DPAD_RIGHT] = SDL_GAMEPAD_BUTTON_DPAD_RIGHT, [PAD_DPAD_DOWN] = SDL_GAMEPAD_BUTTON_DPAD_DOWN,
+    [PAD_LPADDLE1] = SDL_GAMEPAD_BUTTON_LEFT_PADDLE1, [PAD_RPADDLE1] = SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1,
+    [PAD_LPADDLE2] = SDL_GAMEPAD_BUTTON_LEFT_PADDLE2, [PAD_RPADDLE2] = SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2,
+    [PAD_TOUCHPAD] = SDL_GAMEPAD_BUTTON_TOUCHPAD,
 };
 
 // XC3_INPUT_SCRIPT=<file>: lines "<frame> <button> [hold]" or "<frame> LSTICK|RSTICK <x> <y> [hold]", ORed into the real input.
@@ -279,9 +282,18 @@ static void mouse_camera(int32_t out[2]) {
     out[1] = held[1];
 }
 
-static int32_t axis(int16_t v) {
-    int32_t a = v < -STICK_MAX ? -STICK_MAX : v;
-    return a > -STICK_DEAD && a < STICK_DEAD ? 0 : a;
+static float stick_dead[2] = {-1, -1};     // input_pad_deadzone of the left and right stick; live (cfg_version)
+static unsigned stick_dead_seen;
+
+// Under lock: the dead zone of stick s, read again when a setting changes.
+static float stick_dead_get(int s) {
+    unsigned ver = cfg_version();
+    if (stick_dead[0] < 0 || ver != stick_dead_seen) {
+        stick_dead_seen = ver;
+        stick_dead[0] = input_pad_deadzone(0);
+        stick_dead[1] = input_pad_deadzone(1);
+    }
+    return stick_dead[s];
 }
 
 // Open the first gamepad when none is open or the open one went away; logs once per change.
@@ -398,6 +410,7 @@ static void pad_sample(PadSnap *s) {
     for (int p = PAD_SOUTH; p < PAD_ZL; p++) s->pd[p] = SDL_GetGamepadButton(pad, pad_sdl[p]);
     s->pd[PAD_ZL] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > TRIGGER_ON;
     s->pd[PAD_ZR] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > TRIGGER_ON;
+    for (int p = PAD_ZR + 1; p < PAD_COUNT; p++) s->pd[p] = SDL_GetGamepadButton(pad, pad_sdl[p]);   // false without paddles or touchpad
     s->axes[0] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
     s->axes[1] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
     s->axes[2] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX);
@@ -419,10 +432,20 @@ static int pad_read(uint64_t *b, int32_t sl[2], int32_t sr[2]) {
     uint8_t pd[PAD_COUNT] = {0};
     if (!pad_physical(pd)) return 0;
     *b |= input_map_pad_buttons(pd, pad_layout_get());
-    sl[0] = axis(read_snap.axes[0]);
-    sl[1] = -axis(read_snap.axes[1]);
-    sr[0] = axis(read_snap.axes[2]);
-    sr[1] = -axis(read_snap.axes[3]);
+    // SDL's y grows downwards, the Switch's upwards
+    input_pad_stick(read_snap.axes[0], -(int32_t)read_snap.axes[1], stick_dead_get(0), sl);
+    input_pad_stick(read_snap.axes[2], -(int32_t)read_snap.axes[3], stick_dead_get(1), sr);
+    return 1;
+}
+
+int input_pad_stick_percent(double pct[2]) {
+    pct[0] = pct[1] = 0;
+    plat_mutex_lock(&snap_lock);
+    PadSnap s = snap;
+    plat_mutex_unlock(&snap_lock);
+    if (!s.connected) return 0;
+    pct[0] = input_stick_percent(s.axes[0], s.axes[1]);
+    pct[1] = input_stick_percent(s.axes[2], s.axes[3]);
     return 1;
 }
 

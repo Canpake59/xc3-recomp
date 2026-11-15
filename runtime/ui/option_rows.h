@@ -46,8 +46,9 @@ bool opt_choice_list(const char *key, UiTextId label, const char *const *values,
 // shown on the right ("" none).
 bool opt_button(const char *id, UiTextId label, UiTextId desc, const char *value = "");
 // lo..hi in steps of step (left and right held for a second go ten times as fast); fmt formats the value ("%.0f %%").
+// note: shown under the value instead of the "default" mark (a live reading), NULL for none.
 bool opt_slider(const char *key, UiTextId label, float lo, float hi, UiTextId desc, float step = 1,
-                const char *fmt = "%g");
+                const char *fmt = "%g", const char *note = nullptr);
 
 // Binding rows (remapping on the Controls tab): a label and three cells, each selectable on its own (left / right move between them).
 // opt_bind_header: the column titles above them. opt_bind_row: key is the setting's name without XC3_ (BIND_A; the

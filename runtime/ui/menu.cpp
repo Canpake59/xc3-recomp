@@ -646,6 +646,16 @@ static void tab_controls(float scale) {
     opt_slider("XC3_RUMBLE_CURVE", UI_MENU_RUMBLE_CURVE, 0.2f, 1.5f, UI_MENU_RUMBLE_CURVE_DESC, 0.05f, "%.2f");
     opt_toggle("XC3_RUMBLE_TRIGGERS", UI_MENU_RUMBLE_TRIGGERS, UI_MENU_RUMBLE_TRIGGERS_DESC);
     opt_slider("XC3_MOUSE_SENS", UI_MENU_MOUSE_SENS, 0, 10, UI_MENU_MOUSE_SENS_DESC, 0.1f, "%.1f");
+    // Each stick's dead zone; with a gamepad connected each row shows its stick's deflection now, before the dead zone:
+    // a drifting stick's resting value, to set the dead zone above. (From totk-pc-recomp.)
+    double now[2];
+    bool pad = input_pad_stick_percent(now) != 0;
+    char stick_note[2][64];
+    for (int s = 0; s < 2; s++) snprintf(stick_note[s], sizeof stick_note[s], menu_text(UI_MENU_STICK_DEADZONE_NOW), now[s]);
+    opt_slider("XC3_LSTICK_DEADZONE", UI_MENU_LSTICK_DEADZONE, 0, 50, UI_MENU_STICK_DEADZONE_DESC, 1, "%.0f %%",
+               pad ? stick_note[0] : nullptr);
+    opt_slider("XC3_RSTICK_DEADZONE", UI_MENU_RSTICK_DEADZONE, 0, 50, UI_MENU_STICK_DEADZONE_DESC, 1, "%.0f %%",
+               pad ? stick_note[1] : nullptr);
     binds_rows(scale);
     opt_end();
     binds_after_page();
