@@ -73,6 +73,8 @@ Mouse motion (raw input) becomes right-stick deflection. Each presented frame ta
 
 `XC3_MOUSE_SENS` (0 to 10, default 1; higher turns faster, 0 turns the mouse camera and the cursor capture off). While the window is the foreground window the cursor is hidden and confined to the client area. It is released on focus loss, minimise, while F11 changes the window, during a size or move loop and while a text entry is open. Esc releases it by hand: the cursor shows, the mouse camera and mouse buttons stop, and the window can be moved, minimised or closed. A mouse click inside the client area captures it again; that click does not reach the game. Activating the window by a click on its title bar or border does not capture, so it can be dragged or closed right away; Alt+Tab or a click in the client area captures as before. `XC3_INPUT=none` disables the capture too.
 
+`XC3_CURSOR_HIDE` (0 to 30 seconds, default 3; 0 never) hides the cursor once the mouse has rested over the game window that long, which covers the times the capture above does not hide it: the mouse camera off, or the cursor released by Esc. Moving the mouse shows it again. It always shows while the settings menu or a text entry is open. Once the capture comes back (closing the menu), the cursor hides at once, without waiting for the mouse to move.
+
 The stick direction bits (`StickLLeft` to `StickRDown`) are derived from the sticks at 50% deflection. A gamepad plugged in later is picked up within one second; with none connected the log says `input: no gamepad`.
 
 ## Scripted input

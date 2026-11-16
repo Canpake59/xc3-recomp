@@ -224,6 +224,9 @@
 # for one with A at the bottom, Switch letters otherwise). Each prompt shows the button that does the action under
 # pad_layout. Takes effect at the next start.
 # prompts = auto
+# Hide the mouse cursor after it rests over the game this many seconds (0 to 30, default 3; 0 = never). Moving the
+# mouse shows it again; it always shows while the settings menu is open.
+# cursor_hide = 3
 # Mouse camera sensitivity (0 to 10; 0 = no mouse camera and no cursor capture).
 # mouse_sens = 1
 # Gamepad stick dead zones, percent of full deflection (0 to 50, default 8). Raise one if the character or the camera

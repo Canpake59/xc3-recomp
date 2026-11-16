@@ -14,3 +14,6 @@ void ikb_menu_closed(void);                   // the menu closed: a capture that
 
 // ---- what input.c provides the back end
 int input_cursor_allowed(void);               // no text entry or menu open, the mouse camera on, input not disabled
+// XC3_CURSOR_HIDE: how long the mouse rests over the game before its uncaptured cursor hides, in ms; 0 never (the
+// setting is 0, or a text entry or the menu is open, which need the cursor). Moving the mouse shows it again.
+int input_cursor_idle_hide_ms(void);

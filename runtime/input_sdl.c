@@ -26,6 +26,8 @@ static volatile int32_t captured;             // relative mouse mode is on
 enum { CUR_REL = 1, CUR_ESC = 2 };            // as input_win.c: released by Esc or a click elsewhere; by Esc
 static volatile int32_t cur_rel, cur_suspend, cur_pending;
 static uint32_t wake_event;                   // SDL_RegisterEvents: wakes the window thread for a cursor change
+static int idle_hidden;                       // window thread: SDL_HideCursor after XC3_CURSOR_HIDE at rest
+static uint64_t moved_ns;                     // window thread: plat_now_ns of the last mouse motion
 
 // SDL scancode of a key id, 0 for an id without a key (the mouse buttons).
 static SDL_Scancode key_sc(int key) {
@@ -156,13 +158,22 @@ void ikb_menu_closed(void) {
 
 void input_sdl_window(SDL_Window *w) {
     win = w;
+    moved_ns = plat_now_ns();
     wake_event = SDL_RegisterEvents(1);
     plat_xchg32(&focused, (SDL_GetWindowFlags(w) & SDL_WINDOW_INPUT_FOCUS) != 0);
     cursor_apply();
 }
 
+// Window thread: hides the uncaptured cursor once the mouse has rested over the focused window for XC3_CURSOR_HIDE.
+static void idle_check(void) {
+    if (idle_hidden || captured || !focused || !win) return;
+    int ms = input_cursor_idle_hide_ms();
+    if (ms > 0 && plat_now_ns() - moved_ns >= (uint64_t)ms * 1000000u && SDL_HideCursor()) idle_hidden = 1;
+}
+
 void input_sdl_idle(void) {
     if (cur_pending) cursor_apply();
+    idle_check();
 }
 
 void input_sdl_event(const SDL_Event *e) {
@@ -189,6 +200,8 @@ void input_sdl_event(const SDL_Event *e) {
         break;
     }
     case SDL_EVENT_MOUSE_MOTION:
+        moved_ns = plat_now_ns();
+        if (idle_hidden && SDL_ShowCursor()) idle_hidden = 0;
         if (captured) {
             rem_x += e->motion.xrel;
             rem_y += e->motion.yrel;
@@ -200,6 +213,7 @@ void input_sdl_event(const SDL_Event *e) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
         plat_xchg32(&focused, 1);
+        moved_ns = plat_now_ns();   // a fresh wait before hiding
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         plat_xchg32(&focused, 0);
@@ -207,9 +221,11 @@ void input_sdl_event(const SDL_Event *e) {
         memset((void *)key_held, 0, sizeof key_held);   // the key-ups go elsewhere
         plat_xchg32(&esc_held, 0);
         plat_xchg32(&f8_held, 0);
+        if (idle_hidden && SDL_ShowCursor()) idle_hidden = 0;   // shown over other windows
         break;
     }
     cursor_apply();
+    idle_check();
 }
 
 // ---- input_wsys.h
