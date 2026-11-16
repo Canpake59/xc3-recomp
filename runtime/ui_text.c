@@ -100,6 +100,10 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_PICTURE_FIT_KEEP] = "Keep (bars)", [UI_MENU_PICTURE_FIT_STRETCH] = "Stretch",
     [UI_MENU_SHARPNESS] = "FSR sharpness",
     [UI_MENU_SHARPNESS_DESC] = "Sharpening after FSR scaling; 0 turns it off.",
+    [UI_MENU_ANISO] = "Anisotropic filtering",
+    [UI_MENU_ANISO_DESC] = "Keeps textures sharp when seen at an angle, such as the ground ahead. Game keeps the game's "
+                           "own setting; higher costs a little performance. Takes effect after a restart.",
+    [UI_MENU_ANISO_GAME] = "Game",
     [UI_MENU_DLSS_PRESET] = "DLSS model",
     [UI_MENU_DLSS_PRESET_DESC] = "The DLSS model. Default is NVIDIA's choice per mode (K for DLAA, quality and balanced, M for "
                                  "performance, L for ultra performance); K, J, L or M takes that model in every mode. J "
@@ -401,6 +405,10 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_PICTURE_FIT_KEEP] = "Сохранять (полосы)", [UI_MENU_PICTURE_FIT_STRETCH] = "Растягивать",
     [UI_MENU_SHARPNESS] = "Резкость FSR",
     [UI_MENU_SHARPNESS_DESC] = "Повышение резкости после масштабирования FSR; 0 выключает его.",
+    [UI_MENU_ANISO] = "Анизотропная фильтрация",
+    [UI_MENU_ANISO_DESC] = "Сохраняет чёткость текстур, видимых под углом, например земли впереди. «Как в игре» оставляет "
+                           "настройку игры; выше — немного дороже по производительности. Действует после перезапуска.",
+    [UI_MENU_ANISO_GAME] = "Как в игре",
     [UI_MENU_DLSS_PRESET] = "Модель DLSS",
     [UI_MENU_DLSS_PRESET_DESC] = "Модель DLSS. По умолчанию — выбор NVIDIA для каждого режима (K для DLAA, качества и "
                                  "баланса, M для производительности, L для макс. производительности); K, J, L или M "

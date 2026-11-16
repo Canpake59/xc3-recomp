@@ -1530,6 +1530,21 @@ static void sampler_features(VkCtx *c) {
     sf.init = 1;
 }
 
+// XC3_ANISO: the anisotropic filtering of the game's mipmapped textures, at least 2, 4, 8 or 16; "game" (0) keeps the
+// game's own. Read once: samplers are made once and kept.
+static float forced_aniso(void) {
+    static int read;
+    static float v;
+    if (!read) {
+        const char *s = cfg_value("XC3_ANISO");
+        int n = s ? atoi(s) : 0;
+        v = n == 2 || n == 4 || n == 8 || n == 16 ? (float)n : 0;
+        if (v) rt_log("texture: anisotropic filtering at least %.0fx", v);
+        read = 1;
+    }
+    return v;
+}
+
 static VkSampler make_sampler(VkCtx *c, const samp_par *d) {
     sampler_features(c);
     VkSamplerCreateInfo si = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -1561,9 +1576,15 @@ static VkSampler make_sampler(VkCtx *c, const samp_par *d) {
     if (si.maxLod < si.minLod) si.maxLod = si.minLod;
     float lim = c->props.limits.maxSamplerLodBias;
     si.mipLodBias = fmaxf(-lim, fminf(lim, d->lod_bias));
-    if (d->aniso > 1) {
+    float aniso = d->aniso;
+    // Forced only where it smooths textures seen at an angle: a linear, mipmapped minification of colour (not a depth
+    // compare, which would blur shadow edges, nor a nearest or single-level lookup that reads exact texels).
+    if (forced_aniso() > aniso && si.minFilter == VK_FILTER_LINEAR && si.magFilter == VK_FILTER_LINEAR &&
+        mf >= NVN_MIN_FILTER_NEAREST_MIPMAP_NEAREST && !d->cmp_mode && si.maxLod > si.minLod + 0.25f)
+        aniso = forced_aniso();
+    if (aniso > 1) {
         si.anisotropyEnable = VK_TRUE;
-        si.maxAnisotropy = fminf(d->aniso, c->props.limits.maxSamplerAnisotropy);
+        si.maxAnisotropy = fminf(aniso, c->props.limits.maxSamplerAnisotropy);
     }
     if (d->cmp_mode) {
         si.compareEnable = VK_TRUE;

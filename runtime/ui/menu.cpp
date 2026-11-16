@@ -599,6 +599,11 @@ static void tab_screen(float scale) {
     static const UiTextId fit[] = {UI_MENU_PICTURE_FIT_KEEP, UI_MENU_PICTURE_FIT_STRETCH};
     opt_choice("XC3_PICTURE_FIT", UI_MENU_PICTURE_FIT, fit, 2, UI_MENU_PICTURE_FIT_DESC);
     opt_slider("XC3_SHARPNESS", UI_MENU_SHARPNESS, 0, 100, UI_MENU_SHARPNESS_DESC, 5, "%.0f %%");
+    {
+        static const char *const av[] = {"game", "2", "4", "8", "16"};
+        const char *an[] = {menu_text(UI_MENU_ANISO_GAME), "2x", "4x", "8x", "16x"};
+        opt_choice_list("XC3_ANISO", UI_MENU_ANISO, av, an, 5, UI_MENU_ANISO_DESC);
+    }
     row_dlss_preset();
     static const UiTextId reflex[] = {UI_MENU_OFF, UI_MENU_ON, UI_MENU_REFLEX_BOOST};
     opt_choice("XC3_REFLEX", UI_MENU_REFLEX, reflex, 3, UI_MENU_REFLEX_DESC);

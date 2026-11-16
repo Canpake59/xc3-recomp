@@ -30,7 +30,7 @@ static int save_ok = 1;                         // the last cfg_save_to wrote (o
 // Every name the runtime reads (and the patch sets in generated/), without the prefix. A file key outside this list is
 // logged as unknown. A new variable goes here too, or its ini key logs a harmless "unknown key" line.
 static const char *const known[] = {
-    "AB", "APP_POOL", "ASSUME_FOCUS", "ASTC", "ASTC_TIME", "ASYNC_PREEMPT", "AUDIO", "AUDIO_OFF", "AUDIO_PREFILL_MS",
+    "AB", "ANISO", "APP_POOL", "ASSUME_FOCUS", "ASTC", "ASTC_TIME", "ASYNC_PREEMPT", "AUDIO", "AUDIO_OFF", "AUDIO_PREFILL_MS",
     "BACKGROUND_WINDOW", "BIND_A", "BIND_B", "BIND_DOWN", "BIND_L", "BIND_LCLICK", "BIND_LEFT", "BIND_LSTICK_DOWN", "BIND_LSTICK_LEFT",
     "BIND_LSTICK_RIGHT", "BIND_LSTICK_UP", "BIND_MINUS",
     "BIND_PLUS", "BIND_R", "BIND_RCLICK", "BIND_RIGHT", "BIND_RSTICK_DOWN", "BIND_RSTICK_LEFT", "BIND_RSTICK_RIGHT", "BIND_RSTICK_UP",
@@ -60,7 +60,7 @@ static const struct { const char *key, *section; } sections[] = {
     {"REALTIME", "frame rate"}, {"CLOTH_REALTIME", "frame rate"}, {"HIGHFPS_FIX", "frame rate"},
     {"FULLSCREEN", "display"}, {"WINDOW_SIZE", "display"}, {"PERF_OVERLAY", "display"}, {"VK_PRESENT", "display"}, {"VRR", "display"},
     {"GPU_INDEX", "display"}, {"OUTPUT_RES", "display"}, {"RENDER_SCALE", "display"}, {"DYNAMIC_RES", "display"}, {"UPSCALER", "display"},
-    {"SHARPNESS", "display"}, {"DLSS_PRESET", "display"}, {"REFLEX", "display"}, {"PICTURE_FIT", "display"}, {"UI_FIT", "display"}, {"FRAME_GEN", "display"}, {"FRAME_GEN_MULTI", "display"},
+    {"SHARPNESS", "display"}, {"ANISO", "display"}, {"DLSS_PRESET", "display"}, {"REFLEX", "display"}, {"PICTURE_FIT", "display"}, {"UI_FIT", "display"}, {"FRAME_GEN", "display"}, {"FRAME_GEN_MULTI", "display"},
     {"DEVICE_PROFILE", "display"}, {"HDR", "display"}, {"HDR_PEAK_NITS", "display"}, {"HDR_GAME_NITS", "display"},
     {"HDR_UI_NITS", "display"}, {"HDR_HIGHLIGHTS", "display"}, {"HDR_SATURATION", "display"}, {"HDR_GAMMA", "display"},
     {"MENU_LANG", "language"}, {"LANG", "language"}, {"OPERATION_MODE", "language"},
@@ -97,6 +97,7 @@ static const CfgMeta metas[] = {
     {"OUTPUT_RES", "1920x1080", NULL, RESTART}, {"RENDER_SCALE", "game", "game|33|50|58|67|75|100", RESTART},
     {"DYNAMIC_RES", "0", "0|1", LIVE},
     {"UPSCALER", "fsr", "fsr|bilinear|fsr3|dlss|dlaa", LIVE}, {"SHARPNESS", "80", "0..100", LIVE},
+    {"ANISO", "game", "game|2|4|8|16", RESTART},
     {"DLSS_PRESET", "default", "default|k|j|l|m", LIVE}, {"REFLEX", "1", "0|1|2", LIVE},
     {"FRAME_GEN", "off", "off|dlss|fsr", RESTART}, {"FRAME_GEN_MULTI", "2", "2|3|4|5|6", LIVE},
     {"HDR", "0", "0|1", RESTART}, {"HDR_PEAK_NITS", "1000", "400..4000", LIVE}, {"HDR_GAME_NITS", "203", "80..500", LIVE},

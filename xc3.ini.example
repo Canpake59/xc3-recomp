@@ -150,6 +150,9 @@
 # FSR 3's sharpening. Other changes while the game runs take effect at once.
 # upscaler = fsr
 # sharpness = 80
+# Anisotropic filtering of the game's mipmapped textures: game (its own, default), 2, 4, 8 or 16. Higher keeps
+# textures seen at an angle, such as the ground ahead, sharp. Takes effect at the next start.
+# aniso = game
 # The DLSS model: default (NVIDIA's per mode: K for dlaa, quality and balanced, M for performance, L for ultra
 # performance), or k, j, l or m for that model in every mode (j: slightly less ghosting behind moving characters,
 # a little more flicker than k). Changes take effect at once.
