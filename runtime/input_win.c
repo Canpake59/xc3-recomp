@@ -98,6 +98,12 @@ static LONG rel_title(LONG o) { (void)o; return CUR_REL; }
 static LONG rel_clear(LONG o) { (void)o; return 0; }
 static LONG rel_menu_closed(LONG o) { return o & CUR_ESC ? 0 : o; }
 static volatile LONG cur_suspend;          // F11 or a modal size or move loop under way
+// Window thread only. The cursor shows again on WM_SETCURSOR, which Windows sends when the mouse moves, so the timer
+// hides it at once once captured (closing the menu with the mouse still) and after XC3_CURSOR_HIDE at rest otherwise.
+enum { CURSOR_TIMER = 0x58C3, CURSOR_TICK_MS = 200 };
+static int cur_idle_hidden;                // hidden by the idle timer until the mouse moves
+static ULONGLONG cur_moved_ms;             // GetTickCount64 of the last real move over the client area
+static POINT cur_last_pt;
 static SRWLOCK cur_lock = SRWLOCK_INIT;    // serialises cursor_update (window thread, input_block callers)
 // Hide the cursor and confine it to the client area while the window is focused, not suspended, not behind a text entry
 // or the menu, and the mouse camera is on; release it otherwise. Safe from any thread.
@@ -126,12 +132,51 @@ void input_cursor_suspend(int on) {
     cursor_update(gfx_window_handle());
 }
 
+// The cursor is over this window's client area.
+static int cursor_over_client(HWND h) {
+    POINT p;
+    RECT r;
+    if (!GetCursorPos(&p) || WindowFromPoint(p) != h || !ScreenToClient(h, &p) || !GetClientRect(h, &r)) return 0;
+    return PtInRect(&r, p);
+}
+
+static void cursor_tick(HWND h) {
+    if (!cur_active || GetForegroundWindow() != h || !cursor_over_client(h)) return;
+    if (cur_captured) {
+        SetCursor(NULL);
+        return;
+    }
+    int ms = input_cursor_idle_hide_ms();
+    if (!cur_idle_hidden && ms > 0 && GetTickCount64() - cur_moved_ms >= (ULONGLONG)ms) {
+        cur_idle_hidden = 1;
+        SetCursor(NULL);
+    }
+}
+
 // Window procedure hook (gfx_window_win.c calls it first). Returns 1 with *res set when the message is fully handled.
 int input_window_msg(HWND h, UINT m, WPARAM w, LPARAM l, LRESULT *res) {
     switch (m) {
     case WM_CREATE: {
         RAWINPUTDEVICE rid = {.usUsagePage = 1, .usUsage = 2, .dwFlags = 0, .hwndTarget = h};   // generic mouse
         if (!RegisterRawInputDevices(&rid, 1, sizeof rid)) rt_log("input: raw mouse registration failed (%lu)", GetLastError());
+        cur_moved_ms = GetTickCount64();
+        SetTimer(h, CURSOR_TIMER, CURSOR_TICK_MS, NULL);
+        break;
+    }
+    case WM_TIMER:
+        if (w != CURSOR_TIMER) break;
+        cursor_tick(h);
+        *res = 0;
+        return 1;
+    case WM_MOUSEMOVE: {   // Windows also sends it with the mouse still (a window change under it): only a real move
+        POINT p = {(short)LOWORD(l), (short)HIWORD(l)};
+        if (p.x == cur_last_pt.x && p.y == cur_last_pt.y) break;
+        cur_last_pt = p;
+        cur_moved_ms = GetTickCount64();
+        if (cur_idle_hidden) {
+            cur_idle_hidden = 0;
+            if (!cur_captured) SetCursor((HCURSOR)GetClassLongPtrW(h, GCLP_HCURSOR));
+        }
         break;
     }
     case WM_INPUT: {
@@ -145,7 +190,7 @@ int input_window_msg(HWND h, UINT m, WPARAM w, LPARAM l, LRESULT *res) {
         break;   // DefWindowProc must see WM_INPUT for cleanup
     }
     case WM_SETCURSOR:
-        if (cur_captured && LOWORD(l) == HTCLIENT) { SetCursor(NULL); *res = TRUE; return 1; }
+        if ((cur_captured || cur_idle_hidden) && LOWORD(l) == HTCLIENT) { SetCursor(NULL); *res = TRUE; return 1; }
         break;
     case WM_SYSCOMMAND:   // Alt pressed alone would enter the window menu loop, which stalls the game: Alt is a game key
         if ((w & 0xFFF0) == SC_KEYMENU && l == 0) { *res = 0; return 1; }

@@ -179,6 +179,9 @@ static const char *const text_en[UI_TEXT_COUNT] = {
                              "start. Takes effect at the next start.",
     [UI_MENU_PROMPTS_AUTO] = "Automatic", [UI_MENU_PROMPTS_SWITCH] = "Switch", [UI_MENU_PROMPTS_XBOX] = "Xbox",
     [UI_MENU_PROMPTS_PLAYSTATION] = "PlayStation",
+    [UI_MENU_CURSOR_HIDE] = "Hide the mouse cursor after",
+    [UI_MENU_CURSOR_HIDE_DESC] = "Seconds the mouse rests over the game before its cursor hides; moving it shows it again. "
+                                 "0 never hides it. The cursor always shows while this menu is open.",
     [UI_MENU_MOUSE_SENS] = "Mouse camera sensitivity",
     [UI_MENU_MOUSE_SENS_DESC] = "How fast the mouse turns the camera.",
 
@@ -479,6 +482,9 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
                              "Применяется при следующем запуске.",
     [UI_MENU_PROMPTS_AUTO] = "Автоматически", [UI_MENU_PROMPTS_SWITCH] = "Switch", [UI_MENU_PROMPTS_XBOX] = "Xbox",
     [UI_MENU_PROMPTS_PLAYSTATION] = "PlayStation",
+    [UI_MENU_CURSOR_HIDE] = "Скрывать курсор мыши через",
+    [UI_MENU_CURSOR_HIDE_DESC] = "Сколько секунд мышь лежит без движения над игрой, прежде чем курсор скроется; движение "
+                                 "снова показывает его. 0 — не скрывать. В этом меню курсор виден всегда.",
     [UI_MENU_MOUSE_SENS] = "Чувствительность мыши",
     [UI_MENU_MOUSE_SENS_DESC] = "Как быстро мышь поворачивает камеру.",
 

@@ -491,6 +491,12 @@ int input_cursor_allowed(void) {
     return g_block != 1 && g_menu != 1 && mouse_sens_get() > 0 && !(in && !strcmp(in, "none"));
 }
 
+int input_cursor_idle_hide_ms(void) {
+    if (g_block == 1 || g_menu == 1) return 0;   // text entry or the menu: the cursor stays for them
+    double s = cfg_double("XC3_CURSOR_HIDE");
+    return s > 0 ? (int)(s * 1000) : 0;
+}
+
 void input_block(int on) {
     plat_xchg32(&g_block, on ? 1 : 2);
     ikb_cursor_update();
